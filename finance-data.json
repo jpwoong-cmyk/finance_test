@@ -1,0 +1,80 @@
+{
+  "currency": "SGD",
+  "expenses": {
+    "variables": [
+      {
+        "id": "exp_dbs",
+        "name": "DBS",
+        "amount": 820.5
+      },
+      {
+        "id": "exp_uob",
+        "name": "UOB",
+        "amount": 430
+      },
+      {
+        "id": "exp_card",
+        "name": "Credit Card",
+        "amount": 265.4
+      }
+    ]
+  },
+  "savings": {
+    "variables": [
+      {
+        "id": "sav_mari",
+        "name": "MariBank",
+        "amount": 4214.33
+      },
+      {
+        "id": "sav_choc",
+        "name": "Chocolate Finance",
+        "amount": 6001.87
+      },
+      {
+        "id": "sav_stash",
+        "name": "StashAway",
+        "amount": 397.63
+      }
+    ]
+  },
+  "periodSnapshots": {
+    "week": {
+      "expenses": 410.2,
+      "savings": 2550,
+      "current": 2139.8
+    },
+    "month": {
+      "expenses": 1515.9,
+      "savings": 10613.83,
+      "current": 9097.93
+    },
+    "year": {
+      "expenses": 18340.75,
+      "savings": 28450.2,
+      "current": 10109.45
+    }
+  },
+  "activity": [
+    {
+      "id": "txn_001",
+      "section": "expenses",
+      "variableId": "exp_dbs",
+      "variableName": "DBS",
+      "operation": "add",
+      "amount": 42.8,
+      "note": "Dummy expense update",
+      "timestamp": "2026-09-04T08:30:00.000Z"
+    },
+    {
+      "id": "txn_002",
+      "section": "savings",
+      "variableId": "sav_choc",
+      "variableName": "Chocolate Finance",
+      "operation": "set",
+      "amount": 6001.87,
+      "note": "Balance reconciliation",
+      "timestamp": "2026-09-03T12:15:00.000Z"
+    }
+  ]
+}

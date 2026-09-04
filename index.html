@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Finance</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PERSONAL FINANCE</p>
+        <h1>Neon Finance</h1>
+      </div>
+      <div class="period-switcher" role="group" aria-label="Chart period">
+        <button class="period-btn" data-period="week">Week</button>
+        <button class="period-btn active" data-period="month">Month</button>
+        <button class="period-btn" data-period="year">Year</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="summary-grid">
+        <article class="summary-panel current-panel">
+          <span>Current</span>
+          <strong id="currentValue">$0.00</strong>
+          <small id="currentHint">Savings minus expenses</small>
+        </article>
+        <article class="summary-panel expense-panel">
+          <span>Expenses</span>
+          <strong id="expenseValue">$0.00</strong>
+          <small id="expenseCount">0 variables</small>
+        </article>
+        <article class="summary-panel savings-panel">
+          <span>Savings</span>
+          <strong id="savingsValue">$0.00</strong>
+          <small id="savingsCount">0 variables</small>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">OVERVIEW</p>
+              <h2>Money Distribution</h2>
+            </div>
+            <span class="live-pill">LIVE</span>
+          </div>
+
+          <div class="chart-wrap">
+            <canvas id="pieCanvas" width="420" height="420" aria-label="Finance distribution chart"></canvas>
+            <div class="chart-center">
+              <span id="chartPeriodLabel">Month</span>
+              <strong id="chartTotal">$0</strong>
+            </div>
+          </div>
+
+          <div class="legend">
+            <div><span class="legend-dot current"></span>Current</div>
+            <div><span class="legend-dot expense"></span>Expenses</div>
+            <div><span class="legend-dot savings"></span>Savings</div>
+          </div>
+        </article>
+
+        <article class="panel activity-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">ACTIVITY</p>
+              <h2>Recent Changes</h2>
+            </div>
+          </div>
+          <div id="activityList" class="activity-list"></div>
+        </article>
+      </section>
+
+      <section class="accounts-grid">
+        <article class="panel account-panel expense-theme">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">VARIABLES</p>
+              <h2>Expenses</h2>
+            </div>
+            <button class="ghost-btn" data-add-variable="expenses">+ Variable</button>
+          </div>
+          <div id="expensesList" class="variable-list"></div>
+        </article>
+
+        <article class="panel account-panel savings-theme">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">VARIABLES</p>
+              <h2>Savings</h2>
+            </div>
+            <button class="ghost-btn" data-add-variable="savings">+ Variable</button>
+          </div>
+          <div id="savingsList" class="variable-list"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="amountDialog" class="neon-dialog">
+    <form method="dialog" id="amountForm">
+      <input type="hidden" id="dialogSection" />
+      <input type="hidden" id="dialogVariableId" />
+      <input type="hidden" id="dialogOperation" />
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow" id="dialogEyebrow">UPDATE</p>
+          <h3 id="dialogTitle">Update amount</h3>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Close">×</button>
+      </div>
+      <label>
+        Amount
+        <input id="dialogAmount" type="number" min="0" step="0.01" inputmode="decimal" required />
+      </label>
+      <label>
+        Note <span class="muted">optional</span>
+        <input id="dialogNote" type="text" maxlength="80" placeholder="e.g. Bank transfer" />
+      </label>
+      <div class="dialog-actions">
+        <button class="ghost-btn" value="cancel">Cancel</button>
+        <button class="primary-btn" id="dialogSubmit" value="default">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="variableDialog" class="neon-dialog">
+    <form method="dialog" id="variableForm">
+      <input type="hidden" id="newVariableSection" />
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">NEW VARIABLE</p>
+          <h3>Add account / bank</h3>
+        </div>
+        <button class="icon-btn" value="cancel" aria-label="Close">×</button>
+      </div>
+      <label>
+        Variable name
+        <input id="newVariableName" type="text" maxlength="40" placeholder="e.g. DBS" required />
+      </label>
+      <label>
+        Starting amount
+        <input id="newVariableAmount" type="number" min="0" step="0.01" value="0" required />
+      </label>
+      <div class="dialog-actions">
+        <button class="ghost-btn" value="cancel">Cancel</button>
+        <button class="primary-btn" value="default">Add variable</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
