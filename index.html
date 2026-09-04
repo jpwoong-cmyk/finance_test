@@ -7,12 +7,18 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="ambient ambient-expense"></div>
+  <div class="ambient ambient-savings"></div>
+  <div class="ambient ambient-current"></div>
+
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">PERSONAL FINANCE</p>
+        <p class="eyebrow">PERSONAL FINANCE // LIVE LEDGER</p>
         <h1>Neon Finance</h1>
+        <p class="header-copy">Expenses burn. Savings grow. Current cash waits.</p>
       </div>
+
       <div class="period-switcher" role="group" aria-label="Chart period">
         <button class="period-btn" data-period="week">Week</button>
         <button class="period-btn active" data-period="month">Month</button>
@@ -21,21 +27,32 @@
     </header>
 
     <main>
-      <section class="summary-grid">
-        <article class="summary-panel current-panel">
-          <span>Current</span>
-          <strong id="currentValue">$0.00</strong>
-          <small id="currentHint">Savings minus expenses</small>
-        </article>
+      <section class="summary-grid" aria-label="Finance summary">
         <article class="summary-panel expense-panel">
-          <span>Expenses</span>
+          <div class="summary-topline">
+            <span>Expenses</span>
+            <span class="status-dot"></span>
+          </div>
           <strong id="expenseValue">$0.00</strong>
-          <small id="expenseCount">0 variables</small>
+          <small id="expenseCount">0 accounts</small>
         </article>
+
         <article class="summary-panel savings-panel">
-          <span>Savings</span>
+          <div class="summary-topline">
+            <span>Savings</span>
+            <span class="status-dot"></span>
+          </div>
           <strong id="savingsValue">$0.00</strong>
-          <small id="savingsCount">0 variables</small>
+          <small id="savingsCount">0 accounts</small>
+        </article>
+
+        <article class="summary-panel current-panel">
+          <div class="summary-topline">
+            <span>Current</span>
+            <span class="status-dot"></span>
+          </div>
+          <strong id="currentValue">$0.00</strong>
+          <small id="currentCount">0 accounts · stale / available cash</small>
         </article>
       </section>
 
@@ -43,8 +60,8 @@
         <article class="panel chart-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">OVERVIEW</p>
-              <h2>Money Distribution</h2>
+              <p class="eyebrow">MONEY MIX</p>
+              <h2>Distribution</h2>
             </div>
             <span class="live-pill">LIVE</span>
           </div>
@@ -58,16 +75,16 @@
           </div>
 
           <div class="legend">
-            <div><span class="legend-dot current"></span>Current</div>
-            <div><span class="legend-dot expense"></span>Expenses</div>
-            <div><span class="legend-dot savings"></span>Savings</div>
+            <div class="legend-expense"><span class="legend-dot"></span>Expenses</div>
+            <div class="legend-savings"><span class="legend-dot"></span>Savings</div>
+            <div class="legend-current"><span class="legend-dot"></span>Current</div>
           </div>
         </article>
 
         <article class="panel activity-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">ACTIVITY</p>
+              <p class="eyebrow">LEDGER PULSE</p>
               <h2>Recent Changes</h2>
             </div>
           </div>
@@ -75,83 +92,116 @@
         </article>
       </section>
 
-      <section class="accounts-grid">
-        <article class="panel account-panel expense-theme">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">VARIABLES</p>
-              <h2>Expenses</h2>
-            </div>
-            <button class="ghost-btn" data-add-variable="expenses">+ Variable</button>
+      <section class="accounts-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ACCOUNTS</p>
+            <h2>Your money buckets</h2>
           </div>
-          <div id="expensesList" class="variable-list"></div>
-        </article>
+          <p>Open any account card to add or set its amount.</p>
+        </div>
 
-        <article class="panel account-panel savings-theme">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">VARIABLES</p>
-              <h2>Savings</h2>
+        <div class="accounts-grid">
+          <article class="panel account-panel expense-theme">
+            <div class="panel-heading account-heading">
+              <div>
+                <span class="account-kicker">OUTFLOW</span>
+                <h2>Expenses</h2>
+              </div>
+              <button class="add-account-btn" data-add-variable="expenses">+ Account</button>
             </div>
-            <button class="ghost-btn" data-add-variable="savings">+ Variable</button>
-          </div>
-          <div id="savingsList" class="variable-list"></div>
-        </article>
+            <div id="expensesList" class="variable-list"></div>
+          </article>
+
+          <article class="panel account-panel savings-theme">
+            <div class="panel-heading account-heading">
+              <div>
+                <span class="account-kicker">GROWTH</span>
+                <h2>Savings</h2>
+              </div>
+              <button class="add-account-btn" data-add-variable="savings">+ Account</button>
+            </div>
+            <div id="savingsList" class="variable-list"></div>
+          </article>
+
+          <article class="panel account-panel current-theme">
+            <div class="panel-heading account-heading">
+              <div>
+                <span class="account-kicker">IDLE CASH</span>
+                <h2>Current</h2>
+              </div>
+              <button class="add-account-btn" data-add-variable="current">+ Account</button>
+            </div>
+            <div id="currentList" class="variable-list"></div>
+          </article>
+        </div>
       </section>
     </main>
   </div>
 
-  <dialog id="amountDialog" class="neon-dialog">
-    <form method="dialog" id="amountForm">
-      <input type="hidden" id="dialogSection" />
-      <input type="hidden" id="dialogVariableId" />
-      <input type="hidden" id="dialogOperation" />
-      <div class="dialog-head">
-        <div>
-          <p class="eyebrow" id="dialogEyebrow">UPDATE</p>
-          <h3 id="dialogTitle">Update amount</h3>
-        </div>
-        <button class="icon-btn" value="cancel" aria-label="Close">×</button>
-      </div>
-      <label>
-        Amount
-        <input id="dialogAmount" type="number" min="0" step="0.01" inputmode="decimal" required />
-      </label>
-      <label>
-        Note <span class="muted">optional</span>
-        <input id="dialogNote" type="text" maxlength="80" placeholder="e.g. Bank transfer" />
-      </label>
-      <div class="dialog-actions">
-        <button class="ghost-btn" value="cancel">Cancel</button>
-        <button class="primary-btn" id="dialogSubmit" value="default">Apply</button>
-      </div>
-    </form>
-  </dialog>
+  <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
 
-  <dialog id="variableDialog" class="neon-dialog">
-    <form method="dialog" id="variableForm">
-      <input type="hidden" id="newVariableSection" />
-      <div class="dialog-head">
-        <div>
-          <p class="eyebrow">NEW VARIABLE</p>
-          <h3>Add account / bank</h3>
-        </div>
-        <button class="icon-btn" value="cancel" aria-label="Close">×</button>
+  <aside id="accountDrawer" class="account-drawer" aria-hidden="true" aria-labelledby="drawerTitle">
+    <div class="drawer-glow"></div>
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow" id="drawerEyebrow">UPDATE ACCOUNT</p>
+        <h2 id="drawerTitle">Account</h2>
       </div>
-      <label>
-        Variable name
-        <input id="newVariableName" type="text" maxlength="40" placeholder="e.g. DBS" required />
-      </label>
-      <label>
-        Starting amount
-        <input id="newVariableAmount" type="number" min="0" step="0.01" value="0" required />
-      </label>
-      <div class="dialog-actions">
-        <button class="ghost-btn" value="cancel">Cancel</button>
-        <button class="primary-btn" value="default">Add variable</button>
+      <button id="closeDrawer" class="icon-btn" type="button" aria-label="Close account sidebar">×</button>
+    </div>
+
+    <div id="drawerAccountMode" class="drawer-body">
+      <div class="drawer-balance">
+        <span>Current amount</span>
+        <strong id="drawerCurrentAmount">$0.00</strong>
       </div>
-    </form>
-  </dialog>
+
+      <div class="operation-tabs" role="group" aria-label="Amount operation">
+        <button type="button" class="operation-tab active" data-operation="add">+ Add</button>
+        <button type="button" class="operation-tab" data-operation="set">= Set exact</button>
+      </div>
+
+      <form id="amountForm" class="drawer-form">
+        <input type="hidden" id="drawerSection" />
+        <input type="hidden" id="drawerVariableId" />
+        <input type="hidden" id="drawerOperation" value="add" />
+
+        <label>
+          <span id="amountLabel">Amount to add</span>
+          <div class="money-input">
+            <span>S$</span>
+            <input id="drawerAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required />
+          </div>
+        </label>
+
+        <label>
+          Note <span class="muted">optional</span>
+          <input id="drawerNote" type="text" maxlength="80" placeholder="e.g. Balance update" />
+        </label>
+
+        <button class="drawer-submit" id="drawerSubmit" type="submit">Add amount</button>
+      </form>
+    </div>
+
+    <div id="drawerNewMode" class="drawer-body" hidden>
+      <form id="variableForm" class="drawer-form">
+        <input type="hidden" id="newVariableSection" />
+        <label>
+          Account / bank name
+          <input id="newVariableName" type="text" maxlength="40" placeholder="e.g. DBS" required />
+        </label>
+        <label>
+          Starting amount
+          <div class="money-input">
+            <span>S$</span>
+            <input id="newVariableAmount" type="number" min="0" step="0.01" value="0" required />
+          </div>
+        </label>
+        <button class="drawer-submit" type="submit">Create account</button>
+      </form>
+    </div>
+  </aside>
 
   <script src="app.js"></script>
 </body>
