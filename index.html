@@ -191,6 +191,63 @@
 
         <button class="drawer-submit" id="drawerSubmit" type="submit">Add amount</button>
       </form>
+
+      <section id="statementTools" class="statement-tools" hidden>
+        <div class="statement-heading">
+          <div>
+            <span class="statement-kicker">STATEMENT INTELLIGENCE</span>
+            <h3>PDF expense tracker</h3>
+          </div>
+          <span class="local-parse-badge">LOCAL PARSE</span>
+        </div>
+
+        <p class="statement-copy">Import a PDF statement to detect transaction dates and expense amounts. The PDF is read in this browser and is not stored by the app.</p>
+
+        <button id="importStatementBtn" class="statement-import-btn" type="button">
+          <span aria-hidden="true">↥</span> Import PDF Statement
+        </button>
+        <input id="statementFileInput" type="file" accept="application/pdf,.pdf" hidden />
+
+        <div id="statementStatus" class="statement-status" hidden></div>
+
+        <div id="statementPreview" class="statement-preview" hidden>
+          <div class="preview-topline">
+            <div>
+              <span>Detected statement</span>
+              <strong id="statementPreviewName">Statement.pdf</strong>
+            </div>
+            <span id="statementPreviewCount" class="preview-count">0 txns</span>
+          </div>
+
+          <label class="statement-month-field">
+            Month to inspect
+            <input id="statementMonthInput" type="month" />
+          </label>
+
+          <div class="statement-metrics">
+            <div>
+              <span>Monthly expense</span>
+              <strong id="statementMonthTotal">S$0.00</strong>
+            </div>
+            <div>
+              <span>Days detected</span>
+              <strong id="statementDayCount">0</strong>
+            </div>
+          </div>
+
+          <div>
+            <div class="statement-subheading">Daily totals</div>
+            <div id="statementDailyPreview" class="daily-preview-list"></div>
+          </div>
+
+          <div class="statement-preview-actions">
+            <button id="cancelStatementImport" type="button" class="statement-secondary-btn">Cancel</button>
+            <button id="saveStatementImport" type="button" class="statement-save-btn">Save transactions</button>
+          </div>
+        </div>
+
+        <div id="statementHistory" class="statement-history"></div>
+      </section>
     </div>
 
     <div id="drawerNewMode" class="drawer-body" hidden>
