@@ -1,8 +1,9 @@
-const DATA_URL = 'finance-data.json';
-const STORAGE_KEY = 'neon-finance-state-v2';
+const STORAGE_KEY = 'neon-finance-state-v3';
+const BACKUP_EXTENSION = '.nfinance';
 
 let state = null;
 let activePeriod = 'month';
+let toastTimer = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -27,32 +28,158 @@ function makeId(prefix = 'id') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function loadState() {
+function createEmptyState() {
+  return {
+    formatVersion: 1,
+    expenses: { variables: [] },
+    savings: { variables: [] },
+    current: { variables: [] },
+    activity: [],
+    periodSnapshots: {}
+  };
+}
+
+function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    state = normalizeState(JSON.parse(saved));
+
+  if (!saved) {
+    state = createEmptyState();
+    persist();
     return;
   }
 
-  const response = await fetch(DATA_URL);
-  if (!response.ok) throw new Error('Could not load finance-data.json');
-  state = normalizeState(await response.json());
-  persist();
+  try {
+    state = normalizeState(JSON.parse(saved));
+  } catch (error) {
+    console.warn('Local finance state could not be read. Starting empty.', error);
+    state = createEmptyState();
+    persist();
+  }
 }
 
 function normalizeState(raw) {
-  const safe = raw || {};
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const safe = createEmptyState();
+
   ['expenses', 'savings', 'current'].forEach(section => {
-    safe[section] = safe[section] || {};
-    safe[section].variables = Array.isArray(safe[section].variables) ? safe[section].variables : [];
+    const variables = source?.[section]?.variables;
+    safe[section].variables = Array.isArray(variables)
+      ? variables
+          .filter(item => item && typeof item === 'object')
+          .map(item => ({
+            id: String(item.id || makeId(section.slice(0, 3))),
+            name: String(item.name || 'Unnamed account').slice(0, 80),
+            amount: Math.max(0, Number(item.amount) || 0)
+          }))
+      : [];
   });
-  safe.activity = Array.isArray(safe.activity) ? safe.activity : [];
-  safe.periodSnapshots = safe.periodSnapshots || {};
+
+  safe.activity = Array.isArray(source.activity)
+    ? source.activity
+        .filter(item => item && typeof item === 'object')
+        .map(item => ({
+          id: String(item.id || makeId('txn')),
+          section: ['expenses', 'savings', 'current'].includes(item.section) ? item.section : 'current',
+          variableId: String(item.variableId || ''),
+          variableName: String(item.variableName || 'Account').slice(0, 80),
+          operation: item.operation === 'set' ? 'set' : 'add',
+          amount: Math.max(0, Number(item.amount) || 0),
+          note: String(item.note || '').slice(0, 160),
+          timestamp: isValidDate(item.timestamp) ? item.timestamp : nowIso()
+        }))
+    : [];
+
+  if (source.periodSnapshots && typeof source.periodSnapshots === 'object') {
+    ['week', 'month', 'year'].forEach(period => {
+      const snapshot = source.periodSnapshots[period];
+      if (!snapshot || typeof snapshot !== 'object') return;
+      safe.periodSnapshots[period] = {
+        expenses: Math.max(0, Number(snapshot.expenses) || 0),
+        savings: Math.max(0, Number(snapshot.savings) || 0),
+        current: Math.max(0, Number(snapshot.current) || 0)
+      };
+    });
+  }
+
   return safe;
+}
+
+function isValidDate(value) {
+  return value && !Number.isNaN(new Date(value).getTime());
 }
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function exportBackup() {
+  const payload = {
+    ...state,
+    backupMeta: {
+      app: 'Neon Finance',
+      formatVersion: 1,
+      exportedAt: nowIso()
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/octet-stream'
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+
+  anchor.href = url;
+  anchor.download = `neon-finance-backup-${date}${BACKUP_EXTENSION}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+
+  showToast('Backup exported to your device.');
+}
+
+async function importBackupFile(file) {
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const imported = normalizeState(parsed);
+
+    const accountCount = ['expenses', 'savings', 'current']
+      .reduce((sum, section) => sum + imported[section].variables.length, 0);
+
+    const shouldReplace = confirm(
+      `Import this backup and replace the finance data stored in this browser?\n\n${accountCount} account${accountCount === 1 ? '' : 's'} found.`
+    );
+
+    if (!shouldReplace) return;
+
+    state = imported;
+    persist();
+    render();
+    showToast('Backup imported. Local finance data restored.');
+  } catch (error) {
+    console.error(error);
+    showToast('Import failed. Choose a valid Neon Finance backup.', true);
+  } finally {
+    $('#importBackupFile').value = '';
+  }
+}
+
+function showToast(message, isError = false) {
+  const toast = $('#toast');
+  if (!toast) return;
+
+  clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.classList.toggle('error', isError);
+  toast.classList.add('show');
+
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3200);
 }
 
 function getSectionTotal(section) {
@@ -209,8 +336,7 @@ function setOperation(operation) {
 }
 
 function setDrawerTheme(section) {
-  const drawer = $('#accountDrawer');
-  drawer.dataset.theme = section;
+  $('#accountDrawer').dataset.theme = section;
 }
 
 function showDrawer() {
@@ -237,6 +363,10 @@ $$('.operation-tab').forEach(tab => {
 
 $('#closeDrawer').addEventListener('click', closeDrawer);
 $('#drawerBackdrop').addEventListener('click', closeDrawer);
+
+$('#exportBackup').addEventListener('click', exportBackup);
+$('#importBackup').addEventListener('click', () => $('#importBackupFile').click());
+$('#importBackupFile').addEventListener('change', event => importBackupFile(event.target.files?.[0]));
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && $('#accountDrawer').classList.contains('open')) closeDrawer();
@@ -377,9 +507,5 @@ function capitalize(value) {
 
 window.addEventListener('resize', () => drawChart(activePeriod));
 
-loadState()
-  .then(render)
-  .catch(error => {
-    console.error(error);
-    document.body.innerHTML = `<main style="padding:2rem;color:white;font-family:system-ui"><h1>Could not load finance app</h1><p>${escapeHtml(error.message)}</p><p>Run the folder through a local server or deploy it so finance-data.json can be fetched.</p></main>`;
-  });
+loadState();
+render();
