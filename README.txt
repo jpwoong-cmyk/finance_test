@@ -1,41 +1,39 @@
-NEON FINANCE — MONTHLY UI UPDATE
+NEON FINANCE — RESET DATA UPDATE
 
-Files in this package:
-  fetch/statement-import.js
-  fetch/monthly-performance.js
+FILES
+  fetch/reset-data.js              NEW
+  fetch/statement-import.js        REPLACE EXISTING LOADER
 
-Keep your existing:
+KEEP
   fetch/ledger-tools.js
+  fetch/monthly-performance.js
   app.js
   style.css
   index.html
 
 INSTALL
-1. Replace your existing fetch/statement-import.js with the one in this ZIP.
-2. Add fetch/monthly-performance.js to the same /fetch folder.
-3. Keep index.html unchanged.
-4. Hard refresh the page with Ctrl + F5.
+1. Add fetch/reset-data.js
+2. Replace fetch/statement-import.js with this ZIP's version.
+3. No index.html change is required.
+4. Hard refresh with Ctrl + F5.
 
-WHAT CHANGED
-- Visible "Credit Cards" wording is changed back to "Expenses".
-- The existing "Money Mix" heading becomes:
-    FINANCIAL POSITION
-    Current Distribution
-- Adds a new full-width section:
-    MONTHLY PERFORMANCE
-    Savings & Spending Trend
-- Shows the last 12 months.
-- Net Savings = net dated movement in Savings accounts for each month.
-- Spending counts:
-    • positive movements added to Expenses accounts
-    • direct unlinked money leaving Current or Savings
-- Linked internal movements and card payments are excluded from Spending
-  so moving money or paying an already-recorded expense is not counted twice.
-- Includes this-month values and comparison against last month.
-- Hover/tap the chart to inspect a month.
-- Backdated ledger entries automatically appear in the correct historical month.
+BEHAVIOUR
+A "Reset Data" button appears beside the existing Export/Import controls.
 
-NOTE
-Historical months cannot be reconstructed from old balances alone. The chart uses
-dated Balance Trace ledger movements. As you enter/backdate transactions, those
-months populate automatically.
+Reset removes only keys belonging to Neon Finance, not all localStorage for
+the website/domain.
+
+It removes:
+- Accounts and balances
+- Expenses / Savings / Current variable cards
+- Activity and transaction history
+- Balance Trace ledger data
+- Categories and linked movements
+- Monthly snapshots
+- Imported statement metadata
+- Any current/future localStorage or sessionStorage keys beginning with:
+    neon-finance-
+
+Exported .nfinance backup files already saved on the user's device are not touched.
+
+After reset the page reloads and app.js creates a fresh empty state.
