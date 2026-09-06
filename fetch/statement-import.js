@@ -2,16 +2,24 @@
   'use strict';
 
   // Compatibility bridge.
-  // The old PDF statement parser has been retired. index.html already loads
-  // this path, so use it to load the new ledger/reconciliation engine without
-  // requiring an index.html change.
-  if (window.NeonLedgerToolsLoading) return;
-  window.NeonLedgerToolsLoading = true;
+  // index.html already loads this path, so keep the page HTML unchanged and
+  // load the ledger engine first, followed by the monthly performance UI.
+  if (window.NeonFinanceFeatureLoaderActive) return;
+  window.NeonFinanceFeatureLoaderActive = true;
 
-  const script = document.createElement('script');
-  script.src = 'fetch/ledger-tools.js?v=20260906-ledger-v1';
-  script.async = false;
-  script.onload = () => console.info('Neon Finance ledger tools loaded.');
-  script.onerror = () => console.error('Could not load fetch/ledger-tools.js');
-  document.head.appendChild(script);
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Could not load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  loadScript('fetch/ledger-tools.js?v=20260906-ledger-v2')
+    .then(() => loadScript('fetch/monthly-performance.js?v=20260906-monthly-v1'))
+    .then(() => console.info('Neon Finance ledger + monthly performance loaded.'))
+    .catch(error => console.error(error));
 })();
