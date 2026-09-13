@@ -18,8 +18,9 @@
     });
   }
 
-  loadScript('fetch/ledger-tools.js?v=20260913-ledger-v3')
-    .then(() => loadScript('fetch/monthly-performance.js?v=20260913-monthly-v2'))
+  loadScript('fetch/ledger-tools.js?v=20260913-ledger-v4')
+    .then(() => loadScript('fetch/quick-entry.js?v=20260913-quick-v1'))
+    .then(() => loadScript('fetch/monthly-performance.js?v=20260913-monthly-v3'))
     .then(() => loadScript('fetch/reset-data.js?v=20260906-reset-v1'))
     .then(() => console.info('Neon Finance feature modules loaded.'))
     .catch(error => console.error(error));

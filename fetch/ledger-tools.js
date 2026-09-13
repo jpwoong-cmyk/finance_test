@@ -24,6 +24,7 @@
     'Travel',
     'Savings Transfer',
     'Transfer In',
+    'Transfer Out',
     'Card Payment',
     'Refund',
     'Interest',
@@ -174,6 +175,11 @@
       .link-toggle-row { display: flex !important; grid-template-columns: none !important; align-items: center; gap: 10px !important; cursor: pointer; }
       .link-toggle-row input { width: 18px !important; height: 18px; accent-color: var(--drawer-theme); }
       .link-helper { color: #68758f; font-size: .7rem; line-height: 1.45; }
+      .linked-action-row { display:grid; gap:8px; }
+      .linked-action-row > span { color:#7e8aa6; font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+      .linked-operation-tabs { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+      .linked-operation-btn { min-height:36px; border:1px solid rgba(var(--drawer-rgb), .18); background:rgba(255,255,255,.018); color:#91a0be; font-weight:850; }
+      .linked-operation-btn.active { border-color:var(--drawer-theme); color:var(--drawer-theme); background:rgba(var(--drawer-rgb), .075); box-shadow:0 0 15px rgba(var(--drawer-rgb), .10); }
       .ledger-modal-backdrop {
         position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
         background: rgba(0,2,10,.82); backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transition: 180ms ease;
@@ -334,19 +340,35 @@
       box.innerHTML = `
         <label class="link-toggle-row">
           <input id="linkMovementToggle" type="checkbox" />
-          <span>Link this subtraction to another account</span>
+          <span>Link this movement to another account</span>
         </label>
         <div id="linkDestinationWrap" hidden>
           <label>
-            Destination
+            Other account
             <select id="linkDestination" class="link-destination"></select>
           </label>
-          <p class="link-helper">The selected destination receives the same amount. The two movements stay linked in Balance Trace.</p>
+          <div class="linked-action-row">
+            <span>Apply the same amount to that account as</span>
+            <div class="linked-operation-tabs" role="group" aria-label="Linked account action">
+              <button type="button" class="linked-operation-btn active" data-linked-operation="add">+ Add</button>
+              <button type="button" class="linked-operation-btn" data-linked-operation="subtract">− Subtract</button>
+            </div>
+            <input id="linkOperation" type="hidden" value="add" />
+          </div>
+          <p class="link-helper">Any other Expenses, Savings or Current card can be linked. Both entries share one transaction date and transfer ID.</p>
         </div>
       `;
       form.insertBefore(box, noteLabel);
       $('#linkMovementToggle').addEventListener('change', event => {
         $('#linkDestinationWrap').hidden = !event.target.checked;
+        if (event.target.checked) populateLinkDestinations();
+      });
+      $$('.linked-operation-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          const operation = button.dataset.linkedOperation;
+          $('#linkOperation').value = operation;
+          $$('.linked-operation-btn').forEach(item => item.classList.toggle('active', item === button));
+        });
       });
     }
 
@@ -414,7 +436,6 @@
   }
 
   function syncOperationUi() {
-    const section = $('#drawerSection')?.value;
     const operation = $('#drawerOperation')?.value;
     const category = $('#drawerCategory');
     const linkBox = $('#linkMovementBox');
@@ -428,16 +449,27 @@
       category.disabled = false;
     }
 
-    // Linked subtraction is available from Idle/Current cash and Growth/Savings.
-    // Expenses is deliberately destination-only so spending has one clear source of truth.
-    const canLink = ['current', 'savings'].includes(section) && operation === 'subtract';
+    // Add and Subtract can both be linked universally. Set Exact is a
+    // reconciliation action and intentionally stays single-account only.
+    const canLink = operation === 'add' || operation === 'subtract';
     if (linkBox) linkBox.hidden = !canLink;
     if (!canLink) {
       if ($('#linkMovementToggle')) $('#linkMovementToggle').checked = false;
       if ($('#linkDestinationWrap')) $('#linkDestinationWrap').hidden = true;
     } else {
       populateLinkDestinations();
+      // Smart default: money added here usually came out somewhere else;
+      // money subtracted here usually lands somewhere else.
+      setLinkedOperation(operation === 'add' ? 'subtract' : 'add');
     }
+  }
+
+  function setLinkedOperation(operation) {
+    if (!['add', 'subtract'].includes(operation)) return;
+    if ($('#linkOperation')) $('#linkOperation').value = operation;
+    $$('.linked-operation-btn').forEach(button => {
+      button.classList.toggle('active', button.dataset.linkedOperation === operation);
+    });
   }
 
   function populateLinkDestinations() {
@@ -445,42 +477,29 @@
     if (!select) return;
 
     const state = getState();
-    const sourceSection = $('#drawerSection')?.value;
-    const expenses = state.expenses?.variables || [];
-    const savings = state.savings?.variables || [];
-    const current = state.current?.variables || [];
+    const sourceSection = $('#drawerSection')?.value || '';
+    const sourceId = $('#drawerVariableId')?.value || '';
 
-    const optionsFor = (section, items) => items.map(item =>
-      `<option value="${section}|${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${money.format(item.amount)}</option>`
-    ).join('');
+    const groups = [
+      ['expenses', 'Expenses'],
+      ['savings', 'Savings / Growth'],
+      ['current', 'Current / Idle Cash']
+    ];
 
-    if (sourceSection === 'current') {
-      select.innerHTML = `
-        <option value="">Choose destination…</option>
-        <optgroup label="Savings / Growth">
-          ${optionsFor('savings', savings)}
-        </optgroup>
-        <optgroup label="Expenses">
-          ${optionsFor('expenses', expenses)}
-        </optgroup>
-      `;
-      return;
-    }
+    const chunks = ['<option value="">Choose another account…</option>'];
 
-    if (sourceSection === 'savings') {
-      select.innerHTML = `
-        <option value="">Choose destination…</option>
-        <optgroup label="Idle Cash / Current">
-          ${optionsFor('current', current)}
+    groups.forEach(([section, label]) => {
+      const accounts = (state?.[section]?.variables || [])
+        .filter(item => !(section === sourceSection && item.id === sourceId));
+      if (!accounts.length) return;
+      chunks.push(`
+        <optgroup label="${label}">
+          ${accounts.map(item => `<option value="${section}|${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${money.format(item.amount)}</option>`).join('')}
         </optgroup>
-        <optgroup label="Expenses">
-          ${optionsFor('expenses', expenses)}
-        </optgroup>
-      `;
-      return;
-    }
+      `);
+    });
 
-    select.innerHTML = '<option value="">No linked destination available</option>';
+    select.innerHTML = chunks.join('');
   }
 
   function resetDrawerEnhancements() {
@@ -495,6 +514,7 @@
     }
     if ($('#linkMovementToggle')) $('#linkMovementToggle').checked = false;
     if ($('#linkDestinationWrap')) $('#linkDestinationWrap').hidden = true;
+    setLinkedOperation($('#drawerOperation')?.value === 'add' ? 'subtract' : 'add');
     populateLinkDestinations();
     syncOperationUi();
     updateTracePill();
@@ -535,34 +555,8 @@
         : 'Balance Trace · no movements yet';
   }
 
-  function handleAmountSubmit(event) {
-    if (event.target !== $('#amountForm')) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-
-    const state = getState();
-    const section = $('#drawerSection').value;
-    const id = $('#drawerVariableId').value;
-    const operation = $('#drawerOperation').value;
-    const amount = Number($('#drawerAmount').value);
-    const note = $('#drawerNote').value.trim();
-    const transactionDate = $('#drawerTransactionDate').value;
-    const category = operation === 'set' ? 'Unknown' : ($('#drawerCategory').value || 'Unknown');
-    const item = getAccount(section, id);
-
-    if (!item || !['add', 'subtract', 'set'].includes(operation)) return;
-    if (!Number.isFinite(amount) || amount < 0) return;
-    if (!validDateKey(transactionDate)) {
-      showToast('Choose a valid transaction date.', true);
-      return;
-    }
-    if (transactionDate > todayKey()) {
-      showToast('Transaction date cannot be in the future.', true);
-      return;
-    }
-
-    const before = roundMoney(item.amount);
+  function calculateMovement(account, operation, amount) {
+    const before = roundMoney(account.amount);
     let after = before;
     let delta = 0;
 
@@ -571,64 +565,105 @@
       after = roundMoney(before + amount);
     } else if (operation === 'subtract') {
       if (amount > before) {
-        showToast(`Cannot subtract more than ${money.format(before)} from ${item.name}.`, true);
-        return;
+        return { error: `Cannot subtract more than ${money.format(before)} from ${account.name}.` };
       }
       delta = roundMoney(-amount);
       after = roundMoney(before - amount);
-    } else {
+    } else if (operation === 'set') {
       after = roundMoney(amount);
       delta = roundMoney(after - before);
-      if (delta === 0) {
-        showToast('The exact balance is already the same. No adjustment was recorded.');
-        return;
-      }
+      if (delta === 0) return { error: 'The exact balance is already the same. No adjustment was recorded.' };
+    } else {
+      return { error: 'Choose a valid account action.' };
     }
 
+    return { before, after, delta };
+  }
+
+  function executeMovement(options = {}) {
+    const state = getState();
+    const section = String(options.section || '');
+    const id = String(options.id || '');
+    const operation = String(options.operation || '');
+    const amount = Number(options.amount);
+    const transactionDate = String(options.transactionDate || todayKey());
+    const note = String(options.note || '').trim().slice(0, 160);
+    const requestedCategory = String(options.category || 'Unknown');
+    const category = operation === 'set'
+      ? 'Unknown'
+      : CATEGORY_OPTIONS.includes(requestedCategory) ? requestedCategory : 'Unknown';
+    const item = getAccount(section, id);
+
+    if (!item || !['add', 'subtract', 'set'].includes(operation)) {
+      showToast('Choose a valid account and action.', true);
+      return null;
+    }
+    if (!Number.isFinite(amount) || amount < 0 || (operation !== 'set' && amount <= 0)) {
+      showToast('Enter an amount greater than zero.', true);
+      return null;
+    }
+    if (!validDateKey(transactionDate) || transactionDate > todayKey()) {
+      showToast('Choose a valid transaction date that is not in the future.', true);
+      return null;
+    }
+
+    const primary = calculateMovement(item, operation, amount);
+    if (primary.error) {
+      showToast(primary.error, true);
+      return null;
+    }
+
+    const linkedInput = options.linked && operation !== 'set' ? options.linked : null;
     let linked = null;
     let transferId = '';
-    const linkEnabled = ['current', 'savings'].includes(section) &&
-      operation === 'subtract' &&
-      $('#linkMovementToggle')?.checked;
 
-    if (linkEnabled) {
-      const destinationValue = $('#linkDestination')?.value || '';
-      const [linkedSection, linkedId] = destinationValue.split('|');
+    if (linkedInput) {
+      const linkedSection = String(linkedInput.section || '');
+      const linkedId = String(linkedInput.id || '');
+      const linkedOperation = String(linkedInput.operation || '');
       const linkedItem = getAccount(linkedSection, linkedId);
-      const allowedDestinations = section === 'current'
-        ? ['savings', 'expenses']
-        : ['current', 'expenses'];
 
-      if (!linkedItem || !allowedDestinations.includes(linkedSection)) {
-        showToast(
-          section === 'current'
-            ? 'Choose a Savings or Expenses destination.'
-            : 'Choose an Idle Cash or Expenses destination.',
-          true
-        );
-        return;
+      if (!linkedItem || !['add', 'subtract'].includes(linkedOperation)) {
+        showToast('Choose another account and whether to Add or Subtract there.', true);
+        return null;
+      }
+      if (linkedSection === section && linkedId === id) {
+        showToast('A movement cannot be linked back to the same account.', true);
+        return null;
       }
 
-      // A linked subtraction always removes money from the source and ADDS the
-      // same amount to the selected destination. Expenses therefore records the
-      // amount spent instead of behaving like an outstanding credit-card debt.
-      const linkedBefore = roundMoney(linkedItem.amount);
-      const linkedDelta = roundMoney(amount);
-      const linkedAfter = roundMoney(linkedBefore + amount);
-      const linkedCategory = linkedSection === 'expenses'
-        ? category
-        : 'Transfer In';
+      const linkedCalc = calculateMovement(linkedItem, linkedOperation, amount);
+      if (linkedCalc.error) {
+        showToast(linkedCalc.error, true);
+        return null;
+      }
+
+      const requestedLinkedCategory = String(linkedInput.category || '');
+      const inferredLinkedCategory = category === 'Unknown'
+        ? (linkedOperation === 'add' ? 'Transfer In' : 'Transfer Out')
+        : category;
+      const linkedCategory = CATEGORY_OPTIONS.includes(requestedLinkedCategory)
+        ? requestedLinkedCategory
+        : inferredLinkedCategory;
 
       transferId = makeId('transfer');
-      linked = { linkedSection, linkedItem, linkedBefore, linkedAfter, linkedDelta, linkedCategory };
+      linked = {
+        section: linkedSection,
+        item: linkedItem,
+        operation: linkedOperation,
+        before: linkedCalc.before,
+        after: linkedCalc.after,
+        delta: linkedCalc.delta,
+        category: linkedCategory,
+        note: String(linkedInput.note || '').trim().slice(0, 160)
+      };
     }
 
-    item.amount = after;
-
-    const originCategory = linked
-      ? linked.linkedSection === 'expenses' ? category : 'Savings Transfer'
+    const originCategory = linked && category === 'Unknown'
+      ? (operation === 'add' ? 'Transfer In' : operation === 'subtract' ? 'Transfer Out' : 'Unknown')
       : category;
 
+    item.amount = primary.after;
     ledger.push({
       id: makeId('ledger'),
       section,
@@ -636,36 +671,36 @@
       variableName: item.name,
       operation,
       amount: roundMoney(amount),
-      delta,
-      balanceBefore: before,
-      balanceAfter: after,
+      delta: primary.delta,
+      balanceBefore: primary.before,
+      balanceAfter: primary.after,
       transactionDate,
       recordedAt: new Date().toISOString(),
       category: originCategory,
       note,
       transferId,
-      linkedSection: linked?.linkedSection || '',
-      linkedVariableId: linked?.linkedItem.id || '',
-      linkedVariableName: linked?.linkedItem.name || '',
-      source: linked ? 'linked-origin' : 'manual'
+      linkedSection: linked?.section || '',
+      linkedVariableId: linked?.item.id || '',
+      linkedVariableName: linked?.item.name || '',
+      source: String(options.source || (linked ? 'linked-origin' : 'manual')).slice(0, 40)
     });
 
     if (linked) {
-      linked.linkedItem.amount = linked.linkedAfter;
+      linked.item.amount = linked.after;
       ledger.push({
         id: makeId('ledger'),
-        section: linked.linkedSection,
-        variableId: linked.linkedItem.id,
-        variableName: linked.linkedItem.name,
-        operation: linked.linkedDelta >= 0 ? 'add' : 'subtract',
-        amount: roundMoney(Math.abs(linked.linkedDelta)),
-        delta: linked.linkedDelta,
-        balanceBefore: linked.linkedBefore,
-        balanceAfter: linked.linkedAfter,
+        section: linked.section,
+        variableId: linked.item.id,
+        variableName: linked.item.name,
+        operation: linked.operation,
+        amount: roundMoney(amount),
+        delta: linked.delta,
+        balanceBefore: linked.before,
+        balanceAfter: linked.after,
         transactionDate,
         recordedAt: new Date().toISOString(),
-        category: linked.linkedCategory,
-        note: `Linked from ${item.name}${note ? ` · ${note}` : ''}`.slice(0, 160),
+        category: linked.category,
+        note: (linked.note || `Linked with ${item.name}${note ? ` · ${note}` : ''}`).slice(0, 160),
         transferId,
         linkedSection: section,
         linkedVariableId: item.id,
@@ -681,20 +716,79 @@
     enhanceCards();
     renderLedgerActivity();
 
-    $('#drawerCurrentAmount').textContent = money.format(item.amount);
-    if (operation === 'set') $('#drawerAmount').value = item.amount;
+    document.dispatchEvent(new CustomEvent('neon-finance:changed', {
+      detail: {
+        section,
+        id: item.id,
+        operation,
+        amount: roundMoney(amount),
+        transactionDate,
+        transferId,
+        linkedSection: linked?.section || '',
+        linkedId: linked?.item.id || ''
+      }
+    }));
+
+    return {
+      item,
+      operation,
+      amount: roundMoney(amount),
+      delta: primary.delta,
+      transactionDate,
+      transferId,
+      linked
+    };
+  }
+
+  function handleAmountSubmit(event) {
+    if (event.target !== $('#amountForm')) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const section = $('#drawerSection').value;
+    const id = $('#drawerVariableId').value;
+    const operation = $('#drawerOperation').value;
+    const amount = Number($('#drawerAmount').value);
+    const note = $('#drawerNote').value.trim();
+    const transactionDate = $('#drawerTransactionDate').value;
+    const category = operation === 'set' ? 'Unknown' : ($('#drawerCategory').value || 'Unknown');
+
+    let linked = null;
+    if ($('#linkMovementToggle')?.checked && operation !== 'set') {
+      const [linkedSection, linkedId] = ($('#linkDestination')?.value || '').split('|');
+      const linkedOperation = $('#linkOperation')?.value || '';
+      linked = { section: linkedSection, id: linkedId, operation: linkedOperation };
+    }
+
+    const result = executeMovement({
+      section,
+      id,
+      operation,
+      amount,
+      transactionDate,
+      category,
+      note,
+      linked,
+      source: linked ? 'drawer-linked' : 'drawer'
+    });
+
+    if (!result) return;
+
+    $('#drawerCurrentAmount').textContent = money.format(result.item.amount);
+    if (operation === 'set') $('#drawerAmount').value = result.item.amount;
     else $('#drawerAmount').value = '';
     $('#drawerNote').value = '';
     if ($('#linkMovementToggle')) $('#linkMovementToggle').checked = false;
     if ($('#linkDestinationWrap')) $('#linkDestinationWrap').hidden = true;
     updateTracePill();
 
-    if (linked) {
-      showToast(`${money.format(amount)} linked: ${item.name} → ${linked.linkedItem.name}.`);
+    if (result.linked) {
+      showToast(`${money.format(result.amount)} linked: ${result.item.name} ${operationSymbol(operation)} ↔ ${result.linked.item.name} ${operationSymbol(result.linked.operation)}.`);
     } else if (operation === 'set') {
-      showToast(`${item.name} reconciled. ${signedMoney(delta)} recorded as Unknown.`);
+      showToast(`${result.item.name} reconciled. ${signedMoney(result.delta)} recorded as Unknown.`);
     } else {
-      showToast(`${operation === 'subtract' ? 'Subtracted' : 'Added'} ${money.format(amount)} on ${formatLedgerDate(transactionDate)}.`);
+      showToast(`${operation === 'subtract' ? 'Subtracted' : 'Added'} ${money.format(result.amount)} on ${formatLedgerDate(transactionDate)}.`);
     }
   }
 
@@ -1168,6 +1262,27 @@
       }, true);
     }
   }
+
+  function getAccounts() {
+    const state = getState();
+    return ['expenses', 'savings', 'current'].flatMap(section =>
+      (state?.[section]?.variables || []).map(item => ({
+        section,
+        id: item.id,
+        name: item.name,
+        amount: Number(item.amount || 0)
+      }))
+    );
+  }
+
+  window.NeonLedgerTools = {
+    executeMovement,
+    getAccounts,
+    getLedger: () => ledger.map(record => ({ ...record })),
+    categories: [...CATEGORY_OPTIONS],
+    todayKey,
+    sectionLabel
+  };
 
   function init() {
     injectStyles();

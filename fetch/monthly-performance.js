@@ -735,6 +735,8 @@
     window.addEventListener('storage', event => {
       if (event.key === LEDGER_KEY) scheduleRefresh();
     });
+
+    document.addEventListener('neon-finance:changed', scheduleRefresh);
   }
 
   function init() {
