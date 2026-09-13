@@ -107,7 +107,7 @@
   }
 
   function sectionLabel(section) {
-    if (section === 'expenses') return 'Credit Cards';
+    if (section === 'expenses') return 'Expenses';
     if (section === 'savings') return 'Savings';
     return 'Current';
   }
@@ -237,28 +237,28 @@
   function renameUi() {
     const expenseSummary = $('#expenseValue')?.closest('.summary-panel');
     const summaryLabel = expenseSummary?.querySelector('.summary-topline > span:first-child');
-    if (summaryLabel) summaryLabel.textContent = 'Credit Cards';
+    if (summaryLabel) summaryLabel.textContent = 'Expenses';
 
     const expensePanel = $('#expensesList')?.closest('.account-panel');
     if (expensePanel) {
       const heading = expensePanel.querySelector('.account-heading h2');
       const kicker = expensePanel.querySelector('.account-kicker');
-      if (heading) heading.textContent = 'Credit Cards';
-      if (kicker) kicker.textContent = 'OUTSTANDING';
+      if (heading) heading.textContent = 'Expenses';
+      if (kicker) kicker.textContent = 'OUTFLOW';
     }
 
     const legendExpense = $('.legend-expense');
     if (legendExpense) {
       const dot = legendExpense.querySelector('.legend-dot');
-      legendExpense.textContent = 'Credit Cards';
+      legendExpense.textContent = 'Expenses';
       if (dot) legendExpense.prepend(dot);
     }
 
     const sectionCopy = $('.accounts-section .section-heading > p');
-    if (sectionCopy) sectionCopy.textContent = 'Current cash, savings, and outstanding card balances. Open any card to update or reconcile it.';
+    if (sectionCopy) sectionCopy.textContent = 'Open any account to record movements, reconcile balances, or link transfers between accounts.';
 
     const headerCopy = $('.header-copy');
-    if (headerCopy) headerCopy.textContent = 'Current cash moves. Savings grow. Credit card balances wait to be cleared.';
+    if (headerCopy) headerCopy.textContent = 'Track current cash, savings, expenses and monthly movement in one local ledger.';
   }
 
   function enhanceCards() {
@@ -271,7 +271,7 @@
         if (unknown > 0) {
           meta.textContent = `${money.format(unknown)} unknown · open to reconcile`;
         } else if (section === 'expenses') {
-          meta.textContent = 'Outstanding balance · open to update';
+          meta.textContent = 'Expense amount · open to update';
         } else {
           meta.textContent = 'Open to update';
         }
@@ -341,7 +341,7 @@
             Destination
             <select id="linkDestination" class="link-destination"></select>
           </label>
-          <p class="link-helper">Savings receives the same amount. Credit Cards reduce their outstanding balance by the same amount.</p>
+          <p class="link-helper">The selected destination receives the same amount. The two movements stay linked in Balance Trace.</p>
         </div>
       `;
       form.insertBefore(box, noteLabel);
@@ -428,7 +428,9 @@
       category.disabled = false;
     }
 
-    const canLink = section === 'current' && operation === 'subtract';
+    // Linked subtraction is available from Idle/Current cash and Growth/Savings.
+    // Expenses is deliberately destination-only so spending has one clear source of truth.
+    const canLink = ['current', 'savings'].includes(section) && operation === 'subtract';
     if (linkBox) linkBox.hidden = !canLink;
     if (!canLink) {
       if ($('#linkMovementToggle')) $('#linkMovementToggle').checked = false;
@@ -441,19 +443,44 @@
   function populateLinkDestinations() {
     const select = $('#linkDestination');
     if (!select) return;
-    const state = getState();
-    const savings = state.savings?.variables || [];
-    const cards = state.expenses?.variables || [];
 
-    select.innerHTML = `
-      <option value="">Choose destination…</option>
-      <optgroup label="Savings">
-        ${savings.map(item => `<option value="savings|${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${money.format(item.amount)}</option>`).join('')}
-      </optgroup>
-      <optgroup label="Credit Cards">
-        ${cards.map(item => `<option value="expenses|${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${money.format(item.amount)} outstanding</option>`).join('')}
-      </optgroup>
-    `;
+    const state = getState();
+    const sourceSection = $('#drawerSection')?.value;
+    const expenses = state.expenses?.variables || [];
+    const savings = state.savings?.variables || [];
+    const current = state.current?.variables || [];
+
+    const optionsFor = (section, items) => items.map(item =>
+      `<option value="${section}|${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${money.format(item.amount)}</option>`
+    ).join('');
+
+    if (sourceSection === 'current') {
+      select.innerHTML = `
+        <option value="">Choose destination…</option>
+        <optgroup label="Savings / Growth">
+          ${optionsFor('savings', savings)}
+        </optgroup>
+        <optgroup label="Expenses">
+          ${optionsFor('expenses', expenses)}
+        </optgroup>
+      `;
+      return;
+    }
+
+    if (sourceSection === 'savings') {
+      select.innerHTML = `
+        <option value="">Choose destination…</option>
+        <optgroup label="Idle Cash / Current">
+          ${optionsFor('current', current)}
+        </optgroup>
+        <optgroup label="Expenses">
+          ${optionsFor('expenses', expenses)}
+        </optgroup>
+      `;
+      return;
+    }
+
+    select.innerHTML = '<option value="">No linked destination available</option>';
   }
 
   function resetDrawerEnhancements() {
@@ -480,14 +507,14 @@
     const accountMode = $('#drawerAccountMode');
     if (accountMode && !accountMode.hidden) {
       const section = $('#drawerSection').value;
-      if (section === 'expenses') $('#drawerEyebrow').textContent = 'CREDIT // UPDATE';
+      if (section === 'expenses') $('#drawerEyebrow').textContent = 'OUTFLOW // UPDATE';
       resetDrawerEnhancements();
       $('#statementTools')?.setAttribute('hidden', '');
     } else if ($('#drawerNewMode') && !$('#drawerNewMode').hidden) {
       const section = $('#newVariableSection').value;
       if (section === 'expenses') {
-        $('#drawerEyebrow').textContent = 'CREDIT // NEW CARD';
-        $('#drawerTitle').textContent = 'Add Credit Card';
+        $('#drawerEyebrow').textContent = 'OUTFLOW // NEW EXPENSE';
+        $('#drawerTitle').textContent = 'Add Expenses account';
       }
     }
   }
@@ -560,35 +587,37 @@
 
     let linked = null;
     let transferId = '';
-    const linkEnabled = section === 'current' && operation === 'subtract' && $('#linkMovementToggle')?.checked;
+    const linkEnabled = ['current', 'savings'].includes(section) &&
+      operation === 'subtract' &&
+      $('#linkMovementToggle')?.checked;
 
     if (linkEnabled) {
       const destinationValue = $('#linkDestination')?.value || '';
       const [linkedSection, linkedId] = destinationValue.split('|');
       const linkedItem = getAccount(linkedSection, linkedId);
-      if (!linkedItem || !['savings', 'expenses'].includes(linkedSection)) {
-        showToast('Choose a Savings or Credit Card destination.', true);
+      const allowedDestinations = section === 'current'
+        ? ['savings', 'expenses']
+        : ['current', 'expenses'];
+
+      if (!linkedItem || !allowedDestinations.includes(linkedSection)) {
+        showToast(
+          section === 'current'
+            ? 'Choose a Savings or Expenses destination.'
+            : 'Choose an Idle Cash or Expenses destination.',
+          true
+        );
         return;
       }
 
+      // A linked subtraction always removes money from the source and ADDS the
+      // same amount to the selected destination. Expenses therefore records the
+      // amount spent instead of behaving like an outstanding credit-card debt.
       const linkedBefore = roundMoney(linkedItem.amount);
-      let linkedAfter;
-      let linkedDelta;
-      let linkedCategory;
-
-      if (linkedSection === 'savings') {
-        linkedDelta = roundMoney(amount);
-        linkedAfter = roundMoney(linkedBefore + amount);
-        linkedCategory = 'Transfer In';
-      } else {
-        if (amount > linkedBefore) {
-          showToast(`Payment exceeds ${linkedItem.name}'s outstanding balance of ${money.format(linkedBefore)}.`, true);
-          return;
-        }
-        linkedDelta = roundMoney(-amount);
-        linkedAfter = roundMoney(linkedBefore - amount);
-        linkedCategory = 'Card Payment';
-      }
+      const linkedDelta = roundMoney(amount);
+      const linkedAfter = roundMoney(linkedBefore + amount);
+      const linkedCategory = linkedSection === 'expenses'
+        ? category
+        : 'Transfer In';
 
       transferId = makeId('transfer');
       linked = { linkedSection, linkedItem, linkedBefore, linkedAfter, linkedDelta, linkedCategory };
@@ -597,7 +626,7 @@
     item.amount = after;
 
     const originCategory = linked
-      ? linked.linkedSection === 'savings' ? 'Savings Transfer' : 'Card Payment'
+      ? linked.linkedSection === 'expenses' ? category : 'Savings Transfer'
       : category;
 
     ledger.push({

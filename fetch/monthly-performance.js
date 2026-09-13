@@ -55,12 +55,6 @@
     }
 
     const byKey = new Map(months.map(item => [item.key, item]));
-    const nonSpendingCategories = new Set([
-      'Savings Transfer',
-      'Transfer In',
-      'Card Payment',
-      'Investment'
-    ]);
 
     readLedger().forEach(record => {
       const monthKey = String(record?.transactionDate || '').slice(0, 7);
@@ -70,29 +64,17 @@
       const delta = Number(record.delta);
       if (!Number.isFinite(delta) || delta === 0) return;
 
-      // Savings line = net movement into/out of Savings accounts.
+      // Savings = net dated movement across Growth/Savings accounts.
       if (record.section === 'savings') {
         month.savings += delta;
       }
 
-      // Spending rule:
-      // 1) Positive movement on an Expenses account = newly recorded spending/outstanding cost.
-      // 2) Negative movement from Current/Savings with no linked transfer = direct spending.
-      // Linked transfers/card payments are deliberately excluded to prevent double counting.
-      if (record.section === 'expenses' && delta > 0) {
+      // Expenses is the single source of truth for spending.
+      // Current/Savings subtraction alone is not spending. When money is spent,
+      // link or add it into an Expenses variable card. Expense reversals/corrections
+      // reduce the month's net spending naturally through a negative delta.
+      if (record.section === 'expenses') {
         month.spending += delta;
-        return;
-      }
-
-      const isAssetOutflow =
-        (record.section === 'current' || record.section === 'savings') &&
-        delta < 0;
-
-      const isLinked = Boolean(record.transferId);
-      const category = String(record.category || 'Unknown');
-
-      if (isAssetOutflow && !isLinked && !nonSpendingCategories.has(category)) {
-        month.spending += Math.abs(delta);
       }
     });
 
@@ -310,7 +292,7 @@
               <h2>Savings & Spending Trend</h2>
             </div>
             <p class="monthly-performance-subcopy">
-              Twelve-month view of net savings movements and actual spending recorded through the ledger.
+              Twelve-month view of net savings movements and spending recorded in Expenses.
             </p>
           </div>
           <span class="monthly-range-pill">12 MONTHS</span>
@@ -340,7 +322,7 @@
         </div>
 
         <p class="monthly-ledger-note">
-          Historical months populate from dated Balance Trace ledger movements. Backdated entries are placed into their selected month automatically.
+          Spending comes only from dated Expenses movements. Backdated entries are placed into their selected month automatically.
         </p>
       </article>
     `;
